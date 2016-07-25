@@ -1,0 +1,41 @@
+---
+      - name: Create security group
+        ec2_group:
+          name: "{{ db_group }}_security_group"
+          description: "{{ db_group }} security group"
+          region: "{{ region }}"
+          vpc_id: "{{ vpc }}"
+          rules:
+            - proto: tcp
+              from_port: 22
+              to_port: 22
+              cidr_ip: 0.0.0.0/0
+          rules_egress:
+          - proto: tcp
+            from_port: 80
+            to_port: 80
+            cidr_ip: 0.0.0.0/0 
+        register: basic_firewall 
+      - name: Create an EC2 key
+        ec2_key:
+          name: "{{ db_group }}-key"
+          region: "{{ region }}"
+        register: ec2_key 
+      - name: Launch new Instance
+        local_action: ec2 instance_tags="Name=EC2-ASSIGNMENT" group=dbgroup_security_group instance_type={{ instance_type }} image={{ image }} wait=true region={{ region }} keypair= "{{ db_group }}-key"
+        register: ec2
+      - name: Add instance to local host group
+        local_action: lineinfile dest=hosts regexp="{{ item.public_dns_name }}" insertafter="[webserver]" line="{{ item.public_dns_name }} ansible_ssh_private_key_file=~/.ssh/{{ db_group }}-key.pem"
+        with_items: ec2.instances        
+      - name: Install SYSSTAT #to enable "sar-system activity reporter" included in the script
+        apt: name=sysstat update_cache=true state=installed 
+      - name: Install PostgreSQL 
+        apt: name={{ item }} update_cache=true state=installed
+        with_items: 
+          - postgresql 
+          - postgresql-contrib 
+          - libpq-dev 
+          - python-psycopg2
+        tags: packages 
+      - name: Ensure the PostgreSQL service is running 
+        service: name=postgresql state=started enabled=yes 

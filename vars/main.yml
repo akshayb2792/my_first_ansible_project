@@ -1,0 +1,7 @@
+---
+
+instance_type: t2.micro
+db_group: dbgroup
+image: ami-6869aa05
+region: us-east-1
+vpc: vpc-cff20ea8
